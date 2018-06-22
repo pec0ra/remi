@@ -217,13 +217,38 @@ class _EventDictionary(dict, EventSource):
         return ()
 
 
-class Tag(object):
+class Tag(EventSource):
     """
     Tag is the base class of the framework. It represents an element that can be added to the GUI,
     but it is not necessarily graphically representable.
     You can use this class for sending javascript code to the clients.
     """
-    def __init__(self, attributes = {}, _type = '', _class = None,  **kwargs):
+
+    # some constants for the events
+    EVENT_ONCLICK = 'onclick'
+    EVENT_ONDBLCLICK = 'ondblclick'
+    EVENT_ONMOUSEDOWN = 'onmousedown'
+    EVENT_ONMOUSEMOVE = 'onmousemove'
+    EVENT_ONMOUSEOVER = 'onmouseover'
+    EVENT_ONMOUSEOUT = 'onmouseout'
+    EVENT_ONMOUSELEAVE = 'onmouseleave'
+    EVENT_ONMOUSEUP = 'onmouseup'
+    EVENT_ONTOUCHMOVE = 'ontouchmove'
+    EVENT_ONTOUCHSTART = 'ontouchstart'
+    EVENT_ONTOUCHEND = 'ontouchend'
+    EVENT_ONTOUCHENTER = 'ontouchenter'
+    EVENT_ONTOUCHLEAVE = 'ontouchleave'
+    EVENT_ONTOUCHCANCEL = 'ontouchcancel'
+    EVENT_ONKEYDOWN = 'onkeydown'
+    EVENT_ONKEYPRESS = 'onkeypress'
+    EVENT_ONKEYUP = 'onkeyup'
+    EVENT_ONCHANGE = 'onchange'
+    EVENT_ONFOCUS = 'onfocus'
+    EVENT_ONBLUR = 'onblur'
+    EVENT_ONCONTEXTMENU = "oncontextmenu"
+    EVENT_ONUPDATE = 'onupdate'
+
+    def __init__(self, attributes = {}, style = {}, _type = '', _class = None,  *args, **kwargs):
         """
         Args:
             attributes (dict): The attributes to be applied. 
@@ -231,6 +256,8 @@ class Tag(object):
            _class (str): CSS class or '' (defaults to Class.__name__)
            id (str): the unique identifier for the class instance, usefull for public API definition.
         """
+        EventSource.__init__(self, *args, **kwargs)
+
         self._parent = None
 
         self.kwargs = kwargs
@@ -248,9 +275,13 @@ class Tag(object):
 
         self.type = _type
         self.attributes['id'] = str(id(self))
+        self.set_size(kwargs.get('width'), kwargs.get('height'))
+        self.style['margin'] = kwargs.get('margin', '0px')
 
         #attribute['id'] can be overwritten to get a static Tag identifier
         self.attributes.update(attributes)
+        
+        self.set_style(style)
 
         # the runtime instances are processed every time a requests arrives, searching for the called method
         # if a class instance is not present in the runtimeInstances, it will
@@ -405,82 +436,6 @@ class Tag(object):
                         # this implies that a child replication should not be allowed
                         break
 
-
-class Widget(Tag, EventSource):
-    """Base class for gui widgets.
-
-    Widget can be used as generic container. You can add children by the append(value, key) function.
-    Widget can be arranged in absolute positioning (assigning style['top'] and style['left'] attributes to the children
-    or in a simple auto-alignment.
-    You can decide the horizontal or vertical arrangement by the function set_layout_horientation(layout_orientation)
-    passing as parameter Widget.LAYOUT_HORIZONTAL or Widget.LAYOUT_VERTICAL.
-
-    Tips:
-    In html, it is a DIV tag
-    The self.type attribute specifies the HTML tag representation
-    The self.attributes[] attribute specifies the HTML attributes like 'style' 'class' 'id'
-    The self.style[] attribute specifies the CSS style content like 'font' 'color'. It will be packed together with
-    'self.attributes'.
-    """
-
-    # constants
-    LAYOUT_HORIZONTAL = True
-    LAYOUT_VERTICAL = False
-
-    # some constants for the events
-    EVENT_ONCLICK = 'onclick'
-    EVENT_ONDBLCLICK = 'ondblclick'
-    EVENT_ONMOUSEDOWN = 'onmousedown'
-    EVENT_ONMOUSEMOVE = 'onmousemove'
-    EVENT_ONMOUSEOVER = 'onmouseover'
-    EVENT_ONMOUSEOUT = 'onmouseout'
-    EVENT_ONMOUSELEAVE = 'onmouseleave'
-    EVENT_ONMOUSEUP = 'onmouseup'
-    EVENT_ONTOUCHMOVE = 'ontouchmove'
-    EVENT_ONTOUCHSTART = 'ontouchstart'
-    EVENT_ONTOUCHEND = 'ontouchend'
-    EVENT_ONTOUCHENTER = 'ontouchenter'
-    EVENT_ONTOUCHLEAVE = 'ontouchleave'
-    EVENT_ONTOUCHCANCEL = 'ontouchcancel'
-    EVENT_ONKEYDOWN = 'onkeydown'
-    EVENT_ONKEYPRESS = 'onkeypress'
-    EVENT_ONKEYUP = 'onkeyup'
-    EVENT_ONCHANGE = 'onchange'
-    EVENT_ONFOCUS = 'onfocus'
-    EVENT_ONBLUR = 'onblur'
-    EVENT_ONCONTEXTMENU = "oncontextmenu"
-    EVENT_ONUPDATE = 'onupdate'
-
-    @decorate_constructor_parameter_types([])
-    def __init__(self, children = None, style = {}, *args, **kwargs):
-
-        """
-        Args:
-            children (Widget, or iterable of Widgets): The child to be appended. In case of a dictionary,
-                each item's key is used as 'key' param for the single append.
-            style (dict, or json str): The style properties to be applied. 
-            width (int, str): An optional width for the widget (es. width=10 or width='10px' or width='10%').
-            height (int, str): An optional height for the widget (es. height=10 or height='10px' or height='10%').
-            margin (str): CSS margin specifier
-            layout_orientation (Widget.LAYOUT_VERTICAL, Widget.LAYOUT_HORIZONTAL): Widget layout, only honoured for
-                some widget types
-        """
-        if '_type' not in kwargs:
-            kwargs['_type'] = 'div'
-
-        super(Widget, self).__init__(**kwargs)
-        EventSource.__init__(self, *args, **kwargs)
-
-        self.oldRootWidget = None  # used when hiding the widget
-
-        self.style['margin'] = kwargs.get('margin', '0px')
-        self.set_layout_orientation(kwargs.get('layout_orientation', Widget.LAYOUT_VERTICAL))
-        self.set_size(kwargs.get('width'), kwargs.get('height'))
-        self.set_style(style)
-
-        if children:
-            self.append(children)
-
     def set_style(self, style):
         """ Allows to set style properties for the widget.
             Args:
@@ -526,68 +481,11 @@ class Widget(Tag, EventSource):
                 pass
             self.style['height'] = height
 
-    def set_layout_orientation(self, layout_orientation):
-        """For the generic Widget, this function allows to setup the children arrangement.
-
-        Args:
-            layout_orientation (Widget.LAYOUT_HORIZONTAL or Widget.LAYOUT_VERTICAL):
-        """
-        self.layout_orientation = layout_orientation
-
     def redraw(self):
         """Forces a graphic update of the widget"""
         self._need_update()
 
-    def repr(self, changed_widgets={}):
-        """Represents the widget as HTML format, packs all the attributes, children and so on.
-
-        Args:
-            client (App): Client instance.
-            changed_widgets (dict): A dictionary containing a collection of widgets that have to be updated.
-                The Widget that have to be updated is the key, and the value is its textual repr.
-        """
-        return super(Widget, self).repr(changed_widgets)
-
-    def append(self, value, key=''):
-        """Adds a child widget, generating and returning a key if not provided
-
-        In order to access to the specific child in this way widget.children[key].
-
-        Args:
-            value (Widget, or iterable of Widgets): The child to be appended. In case of a dictionary,
-                each item's key is used as 'key' param for the single append.
-            key (str): The unique string identifier for the child. Ignored in case of iterable 'value'
-                param.
-
-        Returns:
-            str: a key used to refer to the child for all future interaction, or a list of keys in case
-                of an iterable 'value' param
-        """
-        if type(value) in (list, tuple, dict):
-            if type(value)==dict:
-                for k in value.keys():
-                    self.append(value[k], k)
-                return value.keys()
-            keys = []
-            for child in value:
-                keys.append( self.append(child) )
-            return keys
-
-        if not isinstance(value, Widget):
-            raise ValueError('value should be a Widget (otherwise use add_child(key,other)')
-
-        key = value.identifier if key == '' else key
-        self.add_child(key, value)
-
-        if self.layout_orientation == Widget.LAYOUT_HORIZONTAL:
-            if 'float' in self.children[key].style.keys():
-                if not (self.children[key].style['float'] == 'none'):
-                    self.children[key].style['float'] = 'left'
-            else:
-                self.children[key].style['float'] = 'left'
-
-        return key
-
+    
     @decorate_set_on_listener("(self, emitter)")
     @decorate_event_js("sendCallback('%(emitter_identifier)s','%(event_name)s');" \
             "event.stopPropagation();event.preventDefault();" \
@@ -857,6 +755,106 @@ class Widget(Tag, EventSource):
         self.ontouchcancel.connect(callback, *userdata)
 
 
+
+class Container(Tag):
+    """ You can decide the horizontal or vertical arrangement by the function set_layout_horientation(layout_orientation)
+        passing as parameter Container.LAYOUT_HORIZONTAL or Container.LAYOUT_VERTICAL.
+    """
+    # constants
+    LAYOUT_HORIZONTAL = True
+    LAYOUT_VERTICAL = False
+
+    def __init__(self, children = {},*args, **kwargs):
+        """
+        Args:
+            children (Widget, or iterable of Widgets): The child to be appended. In case of a dictionary,
+                each item's key is used as 'key' param for the single append.
+            style (dict, or json str): The style properties to be applied. 
+            width (int, str): An optional width for the widget (es. width=10 or width='10px' or width='10%').
+            height (int, str): An optional height for the widget (es. height=10 or height='10px' or height='10%').
+            margin (str): CSS margin specifier
+            layout_orientation (Container.LAYOUT_VERTICAL, Container.LAYOUT_HORIZONTAL): Widget layout, only honoured for
+                some widget types
+        """
+        super(Container, self).__init__(*args, **kwargs)
+        self.set_layout_orientation(kwargs.get('layout_orientation', Container.LAYOUT_VERTICAL))
+        if children:
+            self.append(children)
+
+    def set_layout_orientation(self, layout_orientation):
+        """This function allows to setup the children arrangement.
+
+        Args:
+            layout_orientation (Container.LAYOUT_HORIZONTAL or Container.LAYOUT_VERTICAL):
+        """
+        self.layout_orientation = layout_orientation
+
+    def append(self, value, key=''):
+        """Adds a child widget, generating and returning a key if not provided
+
+        In order to access to the specific child in this way tag.children[key].
+
+        Args:
+            value (Widget, or iterable of Widgets): The child to be appended. In case of a dictionary,
+                each item's key is used as 'key' param for the single append.
+            key (str): The unique string identifier for the child. Ignored in case of iterable 'value'
+                param.
+
+        Returns:
+            str: a key used to refer to the child for all future interaction, or a list of keys in case
+                of an iterable 'value' param
+        """
+        if type(value) in (list, tuple, dict):
+            if type(value)==dict:
+                for k in value.keys():
+                    self.append(value[k], k)
+                return value.keys()
+            keys = []
+            for child in value:
+                keys.append( self.append(child) )
+            return keys
+
+        if not isinstance(value, Tag):
+            raise ValueError('value should be a Tag (otherwise use add_child(key,other)')
+
+        key = value.identifier if key == '' else key
+        self.add_child(key, value)
+
+        if self.layout_orientation == Container.LAYOUT_HORIZONTAL:
+            if 'float' in self.children[key].style.keys():
+                if not (self.children[key].style['float'] == 'none'):
+                    self.children[key].style['float'] = 'left'
+            else:
+                self.children[key].style['float'] = 'left'
+
+        return key
+
+
+class Widget(Container, EventSource):
+    """Base class for gui widgets.
+
+    Widget can be used as generic container. You can add children by the append(value, key) function.
+    Widget can be arranged in absolute positioning (assigning style['top'] and style['left'] attributes to the children
+    or in a simple auto-alignment.
+
+    Tips:
+    In html, it is a DIV tag
+    The self.type attribute specifies the HTML tag representation
+    The self.attributes[] attribute specifies the HTML attributes like 'style' 'class' 'id'
+    The self.style[] attribute specifies the CSS style content like 'font' 'color'. It will be packed together with
+    'self.attributes'.
+    """
+
+    @decorate_constructor_parameter_types([])
+    def __init__(self, children = {}, *args, **kwargs):
+        if '_type' not in kwargs:
+            kwargs['_type'] = 'div'
+
+        super(Widget, self).__init__(children, *args, **kwargs)
+
+        self.oldRootWidget = None  # used when hiding the widget
+
+
 class GridBox(Widget):
     """It contains widgets automatically aligning them to the grid.
     Does not permit children absolute positioning.
@@ -883,7 +881,7 @@ class GridBox(Widget):
     def append(self, value, key=''):
         """Adds a child widget, generating and returning a key if not provided
 
-        In order to access to the specific child in this way widget.children[key].
+        In order to access to the specific child in this way tag.children[key].
 
         Args:
             value (Widget, or iterable of Widgets): The child to be appended. In case of a dictionary,
@@ -905,8 +903,8 @@ class GridBox(Widget):
                 keys.append( self.append(child) )
             return keys
 
-        if not isinstance(value, Widget):
-            raise ValueError('value should be a Widget (otherwise use add_child(key,other)')
+        if not isinstance(value, Tag):
+            raise ValueError('value should be a Tag (otherwise use add_child(key,other)')
 
         key = value.identifier if key == '' else key
         self.add_child(key, value)
@@ -942,7 +940,7 @@ class HBox(Widget):
 
     def append(self, value, key=''):
         """It allows to add child widgets to this.
-        The key allows to access the specific child in this way widget.children[key].
+        The key allows to access the specific child in this way tag.children[key].
         The key have to be numeric and determines the children order in the layout.
 
         Args:
@@ -961,8 +959,8 @@ class HBox(Widget):
             return keys
         
         key = str(key)
-        if not isinstance(value, Widget):
-            raise ValueError('value should be a Widget (otherwise use add_child(key,other)')
+        if not isinstance(value, Tag):
+            raise ValueError('value should be a Tag (otherwise use add_child(key,other)')
 
         if 'left' in value.style.keys():
             del value.style['left']
@@ -1171,10 +1169,10 @@ class TextInput(Widget, _MixinTextualWidget):
 
         self.attributes['autocomplete'] = 'off'
 
-        self.attributes[Widget.EVENT_ONCHANGE] = \
+        self.attributes[Tag.EVENT_ONCHANGE] = \
             "var params={};params['new_value']=document.getElementById('%(emitter_identifier)s').value;" \
             "sendCallbackParam('%(emitter_identifier)s','%(event_name)s',params);"% \
-            {'emitter_identifier': str(self.identifier), 'event_name': Widget.EVENT_ONCHANGE}
+            {'emitter_identifier': str(self.identifier), 'event_name': Tag.EVENT_ONCHANGE}
 
     def set_value(self, text):
         """Sets the text content.
@@ -1314,7 +1312,7 @@ class GenericDialog(Widget):
             kwargs: See Widget.__init__()
         """
         super(GenericDialog, self).__init__(*args, **kwargs)
-        self.set_layout_orientation(Widget.LAYOUT_VERTICAL)
+        self.set_layout_orientation(Container.LAYOUT_VERTICAL)
         self.style.update({'display':'block', 'overflow':'auto', 'margin':'0px auto'})
 
         if len(title) > 0:
@@ -1329,7 +1327,7 @@ class GenericDialog(Widget):
 
         self.container = Widget()
         self.container.style.update({'display':'block', 'overflow':'auto', 'margin':'5px'})
-        self.container.set_layout_orientation(Widget.LAYOUT_VERTICAL)
+        self.container.set_layout_orientation(Container.LAYOUT_VERTICAL)
         self.conf = Button('Ok')
         self.conf.set_size(100, 30)
         self.conf.style['margin'] = '3px'
@@ -1364,7 +1362,7 @@ class GenericDialog(Widget):
         Args:
             key (str): The unique identifier for the field.
             label_description (str): The string content of the description label.
-            field (Widget): The instance of the field Widget. It can be for example a TextInput or maybe
+            field (Widget): The instance of the field  It can be for example a TextInput or maybe
             a custom widget.
         """
         self.inputs[key] = field
@@ -2116,7 +2114,7 @@ class TableTitle(TableItem, _MixinTextualWidget):
         self.type = 'th'
 
 
-class Input(Widget):
+class Input(Tag):
 
     @decorate_constructor_parameter_types([str, str])
     def __init__(self, input_type='', default_value='', *args, **kwargs):
@@ -2124,7 +2122,7 @@ class Input(Widget):
         Args:
             input_type (str): HTML5 input type
             default_value (str):
-            kwargs: See Widget.__init__()
+            kwargs: See Tag.__init__()
         """
         kwargs['_class'] = input_type
         super(Input, self).__init__(*args, **kwargs)
@@ -2133,10 +2131,10 @@ class Input(Widget):
         self.attributes['value'] = str(default_value)
         self.attributes['type'] = input_type
         self.attributes['autocomplete'] = 'off'
-        self.attributes[Widget.EVENT_ONCHANGE] = \
+        self.attributes[Tag.EVENT_ONCHANGE] = \
             "var params={};params['value']=document.getElementById('%(emitter_identifier)s').value;" \
             "sendCallbackParam('%(emitter_identifier)s','%(event_name)s',params);"% \
-        {'emitter_identifier':str(self.identifier), 'event_name':Widget.EVENT_ONCHANGE}
+        {'emitter_identifier':str(self.identifier), 'event_name':Tag.EVENT_ONCHANGE}
 
     def set_value(self, value):
         self.attributes['value'] = str(value)
@@ -2177,7 +2175,7 @@ class CheckBoxLabel(Widget):
             kwargs: See Widget.__init__()
         """
         super(CheckBoxLabel, self).__init__(**kwargs)
-        self.set_layout_orientation(Widget.LAYOUT_HORIZONTAL)
+        self.set_layout_orientation(Container.LAYOUT_HORIZONTAL)
         self._checkbox = CheckBox(checked, user_data)
         self._label = Label(label)
         self.append(self._checkbox, key='checkbox')
@@ -2211,10 +2209,10 @@ class CheckBox(Input):
         """
         super(CheckBox, self).__init__('checkbox', user_data, **kwargs)
         self.set_value(checked)
-        self.attributes[Widget.EVENT_ONCHANGE] = \
+        self.attributes[Tag.EVENT_ONCHANGE] = \
             "var params={};params['value']=document.getElementById('%(emitter_identifier)s').checked;" \
             "sendCallbackParam('%(emitter_identifier)s','%(event_name)s',params);"% \
-            {'emitter_identifier':str(self.identifier), 'event_name':Widget.EVENT_ONCHANGE}
+            {'emitter_identifier':str(self.identifier), 'event_name':Tag.EVENT_ONCHANGE}
 
     @decorate_set_on_listener("(self, emitter, value)")
     @decorate_event
@@ -2290,10 +2288,10 @@ class Slider(Input):
         self.attributes['min'] = str(min)
         self.attributes['max'] = str(max)
         self.attributes['step'] = str(step)
-        self.attributes[Widget.EVENT_ONCHANGE] = \
+        self.attributes[Tag.EVENT_ONCHANGE] = \
             "var params={};params['value']=document.getElementById('%(emitter_identifier)s').value;" \
             "sendCallbackParam('%(emitter_identifier)s','%(event_name)s',params);"% \
-            {'emitter_identifier':str(self.identifier), 'event_name':Widget.EVENT_ONCHANGE}
+            {'emitter_identifier':str(self.identifier), 'event_name':Tag.EVENT_ONCHANGE}
 
     @decorate_set_on_listener("(self, emitter, value)")
     @decorate_event
@@ -2352,7 +2350,7 @@ class FileFolderNavigator(Widget):
     @decorate_constructor_parameter_types([bool, str, bool, bool])
     def __init__(self, multiple_selection, selection_folder, allow_file_selection, allow_folder_selection, **kwargs):
         super(FileFolderNavigator, self).__init__(**kwargs)
-        self.set_layout_orientation(Widget.LAYOUT_VERTICAL)
+        self.set_layout_orientation(Container.LAYOUT_VERTICAL)
         self.style['width'] = '100%'
 
         self.multiple_selection = multiple_selection
@@ -2362,7 +2360,7 @@ class FileFolderNavigator(Widget):
         self.controlsContainer = Widget()
         self.controlsContainer.set_size('100%', '30px')
         self.controlsContainer.style['display'] = 'flex'
-        self.controlsContainer.set_layout_orientation(Widget.LAYOUT_HORIZONTAL)
+        self.controlsContainer.set_layout_orientation(Container.LAYOUT_HORIZONTAL)
         self.controlBack = Button('Up')
         self.controlBack.set_size('10%', '100%')
         self.controlBack.onclick.connect(self.dir_go_back)
@@ -2422,7 +2420,7 @@ class FileFolderNavigator(Widget):
         self.remove_child(self.itemContainer)
         # creation of a new instance of a itemContainer
         self.itemContainer = Widget(width='100%', height=300)
-        self.itemContainer.set_layout_orientation(Widget.LAYOUT_VERTICAL)
+        self.itemContainer.set_layout_orientation(Container.LAYOUT_VERTICAL)
         self.itemContainer.style.update({'overflow-y':'scroll', 'overflow-x':'hidden', 'display':'block'})
 
         for i in l:
@@ -2510,7 +2508,7 @@ class FileFolderItem(Widget):
     @decorate_constructor_parameter_types([str, bool])
     def __init__(self, text, is_folder=False, **kwargs):
         super(FileFolderItem, self).__init__(**kwargs)
-        super(FileFolderItem, self).set_layout_orientation(Widget.LAYOUT_HORIZONTAL)
+        super(FileFolderItem, self).set_layout_orientation(Container.LAYOUT_HORIZONTAL)
         self.style['margin'] = '3px'
         self.isFolder = is_folder
         self.icon = Widget(_class='FileFolderItemIcon')
@@ -2599,7 +2597,7 @@ class MenuBar(Widget):
         """
         super(MenuBar, self).__init__(*args, **kwargs)
         self.type = 'nav'
-        self.set_layout_orientation(Widget.LAYOUT_HORIZONTAL)
+        self.set_layout_orientation(Container.LAYOUT_HORIZONTAL)
 
 
 class Menu(Widget):
@@ -2611,7 +2609,7 @@ class Menu(Widget):
         Args:
             kwargs: See Widget.__init__()
         """
-        super(Menu, self).__init__(layout_orientation = Widget.LAYOUT_HORIZONTAL, *args, **kwargs)
+        super(Menu, self).__init__(layout_orientation = Container.LAYOUT_HORIZONTAL, *args, **kwargs)
         self.type = 'ul'
 
 
@@ -2666,10 +2664,10 @@ class TreeItem(Widget, _MixinTextualWidget):
         self.treeopen = False
         self.attributes['treeopen'] = 'false'
         self.attributes['has-subtree'] = 'false'
-        self.attributes[Widget.EVENT_ONCLICK] = \
+        self.attributes[Tag.EVENT_ONCLICK] = \
             "sendCallback('%(emitter_identifier)s','%(event_name)s');" \
             "event.stopPropagation();event.preventDefault();"% \
-            {'emitter_identifier': str(self.identifier), 'event_name': Widget.EVENT_ONCLICK}
+            {'emitter_identifier': str(self.identifier), 'event_name': Tag.EVENT_ONCLICK}
 
     def append(self, value, key=''):
         if self.sub_container is None:
