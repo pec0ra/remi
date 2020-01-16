@@ -945,8 +945,7 @@ class Widget(Tag, EventSource):
         return ()
 
     @decorate_set_on_listener("(self, emitter)")
-    @decorate_event_js("sendCallback('%(emitter_identifier)s','%(event_name)s');" \
-                       "event.stopPropagation();event.preventDefault();")
+    @decorate_event_js("sendCallback('%(emitter_identifier)s','%(event_name)s');event.stopPropagation();")
     def onclick(self):
         """Called when the Widget gets clicked by the user with the left mouse button."""
         return ()
